@@ -20,6 +20,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <errno.h>
+#include <ctype.h>
 #endif
 
 #include <stdlib.h>
@@ -66,7 +67,7 @@ int main(int argc, char **argv) {
 #define INVALID_SOCKET	-1
 #define SOCKET_ERROR	-1
 	int listen_socket, msgsock;
-	unsigned long NumberOfBytesWritten;
+//	unsigned long NumberOfBytesWritten;
 
 	/* Parse arguments */
 	if (argc >1) {
@@ -171,7 +172,7 @@ int main(int argc, char **argv) {
 		// accept() doesn't make sense on UDP, since we do not listen()
 		//
 		if (socket_type != SOCK_DGRAM) {
-			msgsock = accept(listen_socket,(struct sockaddr*)&from, &fromlen);
+			msgsock = accept(listen_socket,(struct sockaddr*)&from, (socklen_t *)&fromlen);
 			if (msgsock == INVALID_SOCKET) {
 				int errsv = errno;
 				fprintf(stderr,"accept() error %d\n",errsv);
@@ -197,7 +198,7 @@ line100:
 			retval = recv(msgsock,Buffer,sizeof (Buffer),0 );
 		else {
 			retval = recvfrom(msgsock,Buffer,sizeof (Buffer),0,
-				(struct sockaddr *)&from,&fromlen);
+				(struct sockaddr *)&from,(socklen_t *)&fromlen);
 	/*		printf("Received datagram from %s\n",inet_ntoa(from.sin_addr)); */
 		}
 			
