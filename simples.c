@@ -3,6 +3,7 @@
 *       This is a part of the Microsoft Source Code Samples.
 *       Copyright 1996-1997 Microsoft Corporation.
 *       All rights reserved.
+*       All changes to original Microsoft version Copyright 2018 Nehimiah Ministries
 *       This source code is only intended as a supplement to
 *       Microsoft Development Tools and/or WinHelp documentation.
 *       See these sources for detailed information regarding the
