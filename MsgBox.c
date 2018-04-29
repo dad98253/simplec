@@ -6,6 +6,6 @@
 void MsgBox(char *buffer)
 {
 	fprintf(stderr,"%s\n");
-	return 0;
+	return;
 }
 #endif	// WINDOZE
