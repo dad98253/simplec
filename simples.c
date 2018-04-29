@@ -37,6 +37,13 @@
 #define DEFAULT_PORT 5001
 #define DEFAULT_PROTO SOCK_DGRAM // UDP
 void printint (int *ibuf,int num);
+#ifdef WINDOZE
+extern int OpenCon(HANDLE *hDev);
+extern int SetScreenColor( int fcolorcode, int fintensity, int bcolorcode, int bintensity );
+extern int ResetScreenColor( void );
+extern BOOL ParseAndPrintString( HANDLE hDev, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten );
+HANDLE hDev;
+#endif
 
 
 void Usage(char *progname) {
@@ -47,7 +54,9 @@ void Usage(char *progname) {
 	fprintf(stderr,"\tinterface is the ipaddr (in dotted decimal notation)");
 	fprintf(stderr," to bind to\n");
 	fprintf(stderr,"Defaults are UDP,5001 and INADDR_ANY\n");
-//	WSACleanup();
+#ifdef WINDOZE
+	WSACleanup();
+#endif
 	exit(1);
 }
 int main(int argc, char **argv) {
@@ -61,13 +70,17 @@ int main(int argc, char **argv) {
 	int i;
 //	int msgsize;
 	int socket_type = DEFAULT_PROTO;
-//	HANDLE hStdout;
 	struct sockaddr_in local, from;
-//	WSADATA wsaData;
+#ifdef WINDOZE
+	HANDLE hStdout;
+	WSADATA wsaData;
+	SOCKET listen_socket, msgsock;
+	unsigned long NumberOfBytesWritten;
+#else
 #define INVALID_SOCKET	-1
 #define SOCKET_ERROR	-1
 	int listen_socket, msgsock;
-//	unsigned long NumberOfBytesWritten;
+#endif
 
 	/* Parse arguments */
 	if (argc >1) {
@@ -75,9 +88,17 @@ int main(int argc, char **argv) {
 			if ( (argv[i][0] == '-') || (argv[i][0] == '/') ) {
 				switch(tolower(argv[i][1])) {
 					case 'p':
+#ifdef WINDOZE
+						if (!stricmp(argv[i+1], "TCP") )
+#else
 						if (!strcasecmp(argv[i+1], "TCP") )
+#endif
 							socket_type = SOCK_STREAM;
+#ifdef WINDOZE
+						else if (!stricmp(argv[i+1], "UDP") )
+#else
 						else if (!strcasecmp(argv[i+1], "UDP") )
+#endif
 							socket_type = SOCK_DGRAM;
 						else
 							Usage(argv[0]);
@@ -99,20 +120,22 @@ int main(int argc, char **argv) {
 				Usage(argv[0]);
 		}
 	}
-//OpenCon(&hStdout);
-//hDev = hStdout;
-//SetScreenColor( 4, 1, 0, 0);
+#ifdef WINDOZE
+OpenCon(&hStdout);
+hDev = hStdout;
+#else
 	printf("\e[H\e[2J\e[1;31m");
-
+#endif
+//SetScreenColor( 4, 1, 0, 0);
 
 	for (i=0;i<BUFFERSIZE;i++) iMessagesSizes[i] = 0;
-/*
+#ifdef WINDOZE
 	if (WSAStartup(0x202,&wsaData) == SOCKET_ERROR) {
 		fprintf(stderr,"WSAStartup failed with error %d\n",WSAGetLastError());
 		WSACleanup();
 		return -1;
-	} */
-	
+	}
+#endif
 	if (port == 0){
 		Usage(argv[0]);
 	}
@@ -128,9 +151,13 @@ int main(int argc, char **argv) {
 	listen_socket = socket(AF_INET, socket_type,0); // TCP socket
 	
 	if (listen_socket == INVALID_SOCKET){
+#ifdef WINDOZE
+		fprintf(stderr,"socket() failed with error %d\n",WSAGetLastError());
+		WSACleanup();
+#else
 		int errsv = errno;
 		fprintf(stderr,"socket() failed with error %d\n",errsv);
-	//	WSACleanup();
+#endif
 		return -1;
 	}
 	//
@@ -141,9 +168,13 @@ int main(int argc, char **argv) {
 
 	if (bind(listen_socket,(struct sockaddr*)&local,sizeof(local) ) 
 		== SOCKET_ERROR) {
+#ifdef WINDOZE
+		fprintf(stderr,"bind() failed with error %d\n",WSAGetLastError());
+		WSACleanup();
+#else
 		int errsv = errno;
 		fprintf(stderr,"bind() failed with error %d\n",errsv);
-	//	WSACleanup();
+#endif
 		return -1;
 	}
 
@@ -157,26 +188,40 @@ int main(int argc, char **argv) {
 
 	if (socket_type != SOCK_DGRAM) {
 		if (listen(listen_socket,5) == SOCKET_ERROR) {
+#ifdef WINDOZE
+			fprintf(stderr,"listen() failed with error %d\n",WSAGetLastError());
+			WSACleanup();
+#else
 			int errsv = errno;
 			fprintf(stderr,"listen() failed with error %d\n",errsv);
-//			WSACleanup();
+#endif
 			return -1;
 		}
 	}
 	printf("Simple Server Version 3.3\n");
+#ifdef WINDOZE
+	printf("Listening on port %d, protocol %s\n",port, (socket_type == SOCK_STREAM)?"TCP":"UDP");
+	ResetScreenColor();
+#else
 	printf("Listening on port %d, protocol %s\e[0m\n",port, (socket_type == SOCK_STREAM)?"TCP":"UDP");
-//	ResetScreenColor();
+#endif
 	while(1) {
 		fromlen =sizeof(from);
 		//
 		// accept() doesn't make sense on UDP, since we do not listen()
 		//
 		if (socket_type != SOCK_DGRAM) {
+#ifdef WINDOZE
+			msgsock = accept(listen_socket,(struct sockaddr*)&from, &fromlen);
+			if (msgsock == INVALID_SOCKET) {
+				fprintf(stderr,"accept() error %d\n",WSAGetLastError());
+				WSACleanup();
+#else
 			msgsock = accept(listen_socket,(struct sockaddr*)&from, (socklen_t *)&fromlen);
 			if (msgsock == INVALID_SOCKET) {
 				int errsv = errno;
 				fprintf(stderr,"accept() error %d\n",errsv);
-//				WSACleanup();
+#endif
 				return -1;
 			}
 			printf("accepted connection from %s, port %d\n", 
@@ -198,33 +243,50 @@ line100:
 			retval = recv(msgsock,Buffer,sizeof (Buffer),0 );
 		else {
 			retval = recvfrom(msgsock,Buffer,sizeof (Buffer),0,
+#ifdef WINDOZE
+				(struct sockaddr *)&from,&fromlen);
+#else
 				(struct sockaddr *)&from,(socklen_t *)&fromlen);
+#endif
 	/*		printf("Received datagram from %s\n",inet_ntoa(from.sin_addr)); */
 		}
 			
 		if (retval == SOCKET_ERROR) {
+#ifdef WINDOZE
+			fprintf(stderr,"recv() failed: error %d\n",WSAGetLastError());
+			closesocket(msgsock);
+#else
 			int errsv = errno;
 			fprintf(stderr,"recv() failed: error %d\n",errsv);
 			close(msgsock);
+#endif
 //			printint (iMessagesSizes, BUFFERSIZE);
 			continue;
 		}
 		if (retval == 0) {
 			printf("Client closed connection\n");
 //			printint (iMessagesSizes, BUFFERSIZE);
+#ifdef WINDOZE
+			closesocket(msgsock);
+#else
 			close(msgsock);
+#endif
 			continue;
 		}
 //		printf("Received %d bytes, data [%s] from client\n",retval,Buffer);
 		if (strlen(Buffer) < BUFFERSIZE) {
+#ifdef WINDOZE
+			ParseAndPrintString( hDev, Buffer, strlen(Buffer), &NumberOfBytesWritten );
+#else
 			printf("%s",Buffer);
-//				ParseAndPrintString( hDev, Buffer, strlen(Buffer), &NumberOfBytesWritten );
-
+#endif
 		} else {
 			Buffer[BUFFERSIZE-1] = '\000';
+#ifdef WINDOZE
+			ParseAndPrintString( hDev, Buffer, strlen(Buffer), &NumberOfBytesWritten );
+#else
 			printf("%s",Buffer);
-//				ParseAndPrintString( hDev, Buffer, strlen(Buffer), &NumberOfBytesWritten );
-
+#endif
 		}
 		iMessagesSizes[strlen(Buffer)]++;
 /*
