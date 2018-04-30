@@ -2,3 +2,12 @@
 .cproject
 /Debug/
 /Release/
+*.obj
+*.exe
+*.ilk
+*.pch
+*.pcb
+*.dsp
+*.pdb
+*.plg
+vc60.*
