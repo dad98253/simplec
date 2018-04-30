@@ -1,14 +1,15 @@
-/******************************************************************************\
-* simples.c - Simple TCP/UDP server using Winsock 1.1
-*       This is a part of the Microsoft Source Code Samples.
-*       Copyright 1996-1997 Microsoft Corporation.
-*       All rights reserved.
-*       All changes to original Microsoft version Copyright 2018 Nehimiah Ministries
-*       This source code is only intended as a supplement to
-*       Microsoft Development Tools and/or WinHelp documentation.
-*       See these sources for detailed information regarding the
-*       Microsoft samples programs.
-\******************************************************************************/
+#ifdef WINDOZE
+#pragma message( "Compiling " __FILE__ " on " __DATE__ " at " __TIME__ )
+#pragma message( "File last modified on " __TIMESTAMP__ )
+#pragma message( "  ")
+#pragma title( "My Secret Box version 2.0" )
+#pragma subtitle( "Copyright (c) 2003 - 2015, Nehemiah Ministries, Inc." )
+#pragma comment( compiler )
+#pragma comment( user, "File: " __FILE__ ". Compiled on " __DATE__ " at " __TIME__ ".  Last modified on " __TIMESTAMP__ )
+#endif
+
+// simples.c - An Internet Protocol server application for viewing ANSI (color) text data sent via UDP or TCP.
+
 #ifdef WINDOZE
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
@@ -34,8 +35,8 @@
 #endif
 #define MIN(x, y) (((x) > (y)) ? (y) : (x))
 
-#define DEFAULT_PORT 5001
-#define DEFAULT_PROTO SOCK_DGRAM // UDP
+#define DEF_PORT 5001
+#define DEF_PROTOCOL SOCK_DGRAM // UDP
 void printint (int *ibuf,int num);
 #ifdef WINDOZE
 extern int OpenCon(HANDLE *hDev);
@@ -46,14 +47,13 @@ HANDLE hDev;
 #endif
 
 
-void Usage(char *progname) {
-	fprintf(stderr,"Usage\n%s -p [protocol] -e [endpoint] -i [interface]\n",
-		progname);
-	fprintf(stderr,"Where:\n\tprotocol is one of TCP or UDP\n");
-	fprintf(stderr,"\tendpoint is the port to listen on\n");
-	fprintf(stderr,"\tinterface is the ipaddr (in dotted decimal notation)");
-	fprintf(stderr," to bind to\n");
-	fprintf(stderr,"Defaults are UDP,5001 and INADDR_ANY\n");
+void usage(char *arg) {
+	fprintf(stderr,"Usage : %s -p [protocol] -e [port] -i [ipaddr]\n",
+		arg);
+	fprintf(stderr,"Where:\n\tprotocol is TCP or UDP\n");
+	fprintf(stderr,"\tport is the port to listen on\n");
+	fprintf(stderr,"\tipaddr is the ip address to bind to\n");
+	fprintf(stderr,"Defaults are UDP, 5001 and INADDR_ANY\n");
 #ifdef WINDOZE
 	WSACleanup();
 #endif
@@ -61,63 +61,65 @@ void Usage(char *progname) {
 }
 int main(int argc, char **argv) {
 #define BUFFERSIZE 50000
-	char Buffer[BUFFERSIZE];
 	int iMessagesSizes[BUFFERSIZE];
-	char *interface= NULL;
-	unsigned short port=DEFAULT_PORT;
-	int retval;
-	int fromlen;
 	int i;
-//	int msgsize;
-	int socket_type = DEFAULT_PROTO;
+	int flen;
+	int retval;
+	int socktype = DEF_PROTOCOL;
+	unsigned short port=DEF_PORT;
+	char *inter= NULL;
+	char buf[BUFFERSIZE];
 	struct sockaddr_in local, from;
 #ifdef WINDOZE
 	HANDLE hStdout;
 	WSADATA wsaData;
-	SOCKET listen_socket, msgsock;
+	SOCKET listensock, msgsock;
 	unsigned long NumberOfBytesWritten;
 #else
 #define INVALID_SOCKET	-1
 #define SOCKET_ERROR	-1
-	int listen_socket, msgsock;
+	int listensock, msgsock;
 #endif
 
-	/* Parse arguments */
+	// command line arguments
 	if (argc >1) {
 		for(i=1;i <argc;i++) {
 			if ( (argv[i][0] == '-') || (argv[i][0] == '/') ) {
 				switch(tolower(argv[i][1])) {
+
+					case 'e':
+					port = atoi(argv[++i]);
+					break;
+
 					case 'p':
 #ifdef WINDOZE
 						if (!stricmp(argv[i+1], "TCP") )
 #else
 						if (!strcasecmp(argv[i+1], "TCP") )
 #endif
-							socket_type = SOCK_STREAM;
+							socktype = SOCK_STREAM;
 #ifdef WINDOZE
 						else if (!stricmp(argv[i+1], "UDP") )
 #else
 						else if (!strcasecmp(argv[i+1], "UDP") )
 #endif
-							socket_type = SOCK_DGRAM;
+							socktype = SOCK_DGRAM;
 						else
-							Usage(argv[0]);
+							usage(argv[0]);
 						i++;
 						break;
 
 					case 'i':
-						interface = argv[++i];
+						inter = argv[++i];
 						break;
-					case 'e':
-						port = atoi(argv[++i]);
-						break;
+
 					default:
-						Usage(argv[0]);
+						usage(argv[0]);
 						break;
 				}
 			}
 			else
-				Usage(argv[0]);
+				usage(argv[0]);
 		}
 	}
 #ifdef WINDOZE
@@ -130,142 +132,110 @@ hDev = hStdout;
 
 	for (i=0;i<BUFFERSIZE;i++) iMessagesSizes[i] = 0;
 #ifdef WINDOZE
+	// start up the winsock by process
 	if (WSAStartup(0x202,&wsaData) == SOCKET_ERROR) {
-		fprintf(stderr,"WSAStartup failed with error %d\n",WSAGetLastError());
+		fprintf(stderr,"winsock failed to initialize, error number = %d\n",WSAGetLastError());
 		WSACleanup();
 		return -1;
 	}
 #endif
-	if (port == 0){
-		Usage(argv[0]);
+	if ( port < 1 || port > 65535){
+		usage(argv[0]);
 	}
 
 	local.sin_family = AF_INET;
-	local.sin_addr.s_addr = (!interface)?INADDR_ANY:inet_addr(interface); 
-
-	/* 
-	 * Port MUST be in Network Byte Order
-	 */
+	local.sin_addr.s_addr = (!inter)?INADDR_ANY:inet_addr(inter); 
 	local.sin_port = htons(port);
 
-	listen_socket = socket(AF_INET, socket_type,0); // TCP socket
+	listensock = socket(AF_INET, socktype,0); // connect via TCP
 	
-	if (listen_socket == INVALID_SOCKET){
+	if (listensock == INVALID_SOCKET){
 #ifdef WINDOZE
-		fprintf(stderr,"socket() failed with error %d\n",WSAGetLastError());
+		fprintf(stderr,"TCP socket open failed, error number = %d\n",WSAGetLastError());
 		WSACleanup();
 #else
-		int errsv = errno;
-		fprintf(stderr,"socket() failed with error %d\n",errsv);
-#endif
-		return -1;
-	}
-	//
-	// bind() associates a local address and port combination with the
-	// socket just created. This is most useful when the application is a 
-	// server that has a well-known port that clients know about in advance.
-	//
-
-	if (bind(listen_socket,(struct sockaddr*)&local,sizeof(local) ) 
-		== SOCKET_ERROR) {
-#ifdef WINDOZE
-		fprintf(stderr,"bind() failed with error %d\n",WSAGetLastError());
-		WSACleanup();
-#else
-		int errsv = errno;
-		fprintf(stderr,"bind() failed with error %d\n",errsv);
+		int errornumsave = errno;
+		fprintf(stderr,"TCP socket open failed, error number = %d\n",errornumsave);
 #endif
 		return -1;
 	}
 
-	//
-	// So far, everything we did was applicable to TCP as well as UDP.
-	// However, there are certain steps that do not work when the server is
-	// using UDP.
-	//
-
-	// We cannot listen() on a UDP socket.
-
-	if (socket_type != SOCK_DGRAM) {
-		if (listen(listen_socket,5) == SOCKET_ERROR) {
+	if (bind(listensock,(struct sockaddr*)&local,sizeof(local) ) == SOCKET_ERROR) {
 #ifdef WINDOZE
-			fprintf(stderr,"listen() failed with error %d\n",WSAGetLastError());
+		fprintf(stderr,"TCP bind failed, error number = %d\n",WSAGetLastError());
+		WSACleanup();
+#else
+		int errornumsave = errno;
+		fprintf(stderr,"TCP bind failed, error number = %d\n",errornumsave);
+#endif
+		return -1;
+	}
+
+	if (socktype != SOCK_DGRAM) {
+		if (listen(listensock,5) == SOCKET_ERROR) {
+#ifdef WINDOZE
+			fprintf(stderr,"UDP listen failed, error number = %d\n",WSAGetLastError());
 			WSACleanup();
 #else
-			int errsv = errno;
-			fprintf(stderr,"listen() failed with error %d\n",errsv);
+			int errornumsave = errno;
+			fprintf(stderr,"UDP listen failed, error number = %d\n",errornumsave);
 #endif
 			return -1;
 		}
 	}
-	printf("Simple Server Version 3.3\n");
+	printf("Remote Debug Server Version 3.0\n");
 #ifdef WINDOZE
-	printf("Listening on port %d, protocol %s\n",port, (socket_type == SOCK_STREAM)?"TCP":"UDP");
+	printf("Listening on %s port %d\n", (socktype == SOCK_STREAM)?"TCP":"UDP", port);
 	ResetScreenColor();
 #else
-	printf("Listening on port %d, protocol %s\e[0m\n",port, (socket_type == SOCK_STREAM)?"TCP":"UDP");
+	printf("Listening on %s port %d\e[0m\n", (socktype == SOCK_STREAM)?"TCP":"UDP", port);
 #endif
 	while(1) {
-		fromlen =sizeof(from);
-		//
-		// accept() doesn't make sense on UDP, since we do not listen()
-		//
-		if (socket_type != SOCK_DGRAM) {
+		flen =sizeof(from);
+		if (socktype != SOCK_DGRAM) {
 #ifdef WINDOZE
-			msgsock = accept(listen_socket,(struct sockaddr*)&from, &fromlen);
+			msgsock = accept(listensock,(struct sockaddr*)&from, &flen);
 			if (msgsock == INVALID_SOCKET) {
 				fprintf(stderr,"accept() error %d\n",WSAGetLastError());
 				WSACleanup();
 #else
-			msgsock = accept(listen_socket,(struct sockaddr*)&from, (socklen_t *)&fromlen);
+			msgsock = accept(listensock,(struct sockaddr*)&from, (socklen_t *)&flen);
 			if (msgsock == INVALID_SOCKET) {
-				int errsv = errno;
-				fprintf(stderr,"accept() error %d\n",errsv);
+				int errornumsave = errno;
+				fprintf(stderr,"accept() error %d\n",errornumsave);
 #endif
 				return -1;
 			}
-			printf("accepted connection from %s, port %d\n", 
-						inet_ntoa(from.sin_addr),
-						htons(from.sin_port)) ;
-			
+			printf("connected from %s, port %d\n", inet_ntoa(from.sin_addr), htons(from.sin_port)) ;
 		}
 		else
-			msgsock = listen_socket;
+			msgsock = listensock;
 
-		//
-		// In the case of SOCK_STREAM, the server can do recv() and 
-		// send() on the accepted socket and then close it.
-
-		// However, for SOCK_DGRAM (UDP), the server will do
-		// recvfrom() and sendto()  in a loop.
-line100:
-		if (socket_type != SOCK_DGRAM)
-			retval = recv(msgsock,Buffer,sizeof (Buffer),0 );
+loop1:
+		if (socktype != SOCK_DGRAM)
+			retval = recv(msgsock,buf,sizeof (buf),0 );
 		else {
-			retval = recvfrom(msgsock,Buffer,sizeof (Buffer),0,
+			retval = recvfrom(msgsock,buf,sizeof (buf),0,
 #ifdef WINDOZE
-				(struct sockaddr *)&from,&fromlen);
+				(struct sockaddr *)&from,&flen);
 #else
-				(struct sockaddr *)&from,(socklen_t *)&fromlen);
+				(struct sockaddr *)&from,(socklen_t *)&flen);
 #endif
-	/*		printf("Received datagram from %s\n",inet_ntoa(from.sin_addr)); */
 		}
 			
 		if (retval == SOCKET_ERROR) {
 #ifdef WINDOZE
-			fprintf(stderr,"recv() failed: error %d\n",WSAGetLastError());
+			fprintf(stderr,"UDP recv failed, error number = %d\n",WSAGetLastError());
 			closesocket(msgsock);
 #else
-			int errsv = errno;
-			fprintf(stderr,"recv() failed: error %d\n",errsv);
+			int errornumsave = errno;
+			fprintf(stderr,"UDP recv failed, error number = %d\n",errornumsave);
 			close(msgsock);
 #endif
-//			printint (iMessagesSizes, BUFFERSIZE);
 			continue;
 		}
 		if (retval == 0) {
-			printf("Client closed connection\n");
-//			printint (iMessagesSizes, BUFFERSIZE);
+			printf("client dis-connected\n");
 #ifdef WINDOZE
 			closesocket(msgsock);
 #else
@@ -273,35 +243,24 @@ line100:
 #endif
 			continue;
 		}
-//		printf("Received %d bytes, data [%s] from client\n",retval,Buffer);
-		if (strlen(Buffer) < BUFFERSIZE) {
+		if (strlen(buf) < BUFFERSIZE) {
 #ifdef WINDOZE
-			ParseAndPrintString( hDev, Buffer, strlen(Buffer), &NumberOfBytesWritten );
+			ParseAndPrintString( hDev, buf, strlen(buf), &NumberOfBytesWritten );
 #else
-			printf("%s",Buffer);
+			printf("%s",buf);
 #endif
 		} else {
-			Buffer[BUFFERSIZE-1] = '\000';
+			buf[BUFFERSIZE-1] = '\000';
 #ifdef WINDOZE
-			ParseAndPrintString( hDev, Buffer, strlen(Buffer), &NumberOfBytesWritten );
+			ParseAndPrintString( hDev, buf, strlen(buf), &NumberOfBytesWritten );
 #else
-			printf("%s",Buffer);
+			printf("%s",buf);
 #endif
 		}
-		iMessagesSizes[strlen(Buffer)]++;
-/*
-		printf("Echoing same data back to client\n");
-		msgsize = MIN(strlen(Buffer)+1,BUFFERSIZE);
-		if (socket_type != SOCK_DGRAM) retval = send(msgsock,Buffer,msgsize,0);
-		else retval = sendto(msgsock,Buffer,msgsize,0,(struct sockaddr *)&from,fromlen);
-		if (retval == SOCKET_ERROR) {
-			fprintf(stderr,"send() failed: error %d\n",WSAGetLastError());
-		}*/
-		if (socket_type != SOCK_DGRAM){
-//			printf("Terminating connection\n");
-//			closesocket(msgsock);
-			goto line100;
-		} /*else printf("UDP server looping back for more requests\n"); */
+		iMessagesSizes[strlen(buf)]++;
+		if (socktype != SOCK_DGRAM){
+			goto loop1;
+		}
 		continue;
 	}
 	printint (iMessagesSizes, BUFFERSIZE);
