@@ -250,7 +250,12 @@ loop1:
 #else
 			close(msgsock);
 #endif
-			continue;
+			if ( (ierrorcount++) < MAXERRORCNT ) {
+				goto loop0;	// reest everything
+			} else{
+				break;	// admit defeat
+			}
+//			continue;
 		}
 		if (strlen(buf) < BUFFERSIZE) {
 #ifdef WINDOZE
