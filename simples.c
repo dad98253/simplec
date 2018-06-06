@@ -36,7 +36,9 @@
 #define MIN(x, y) (((x) > (y)) ? (y) : (x))
 
 #define DEF_PORT 5001
-#define DEF_PROTOCOL SOCK_DGRAM // UDP
+// define default protocol to be UDP
+#define DEF_PROTOCOL SOCK_DGRAM
+#define MAXERRORCNT		20
 void printint (int *ibuf,int num);
 #ifdef WINDOZE
 extern int OpenCon(HANDLE *hDev);
@@ -65,6 +67,7 @@ int main(int argc, char **argv) {
 	int i;
 	int flen;
 	int retval;
+	int ierrorcount = 0;
 	int socktype = DEF_PROTOCOL;
 	unsigned short port=DEF_PORT;
 	char *inter= NULL;
@@ -142,12 +145,12 @@ hDev = hStdout;
 	if ( port < 1 || port > 65535){
 		usage(argv[0]);
 	}
-
+loop0:
 	local.sin_family = AF_INET;
 	local.sin_addr.s_addr = (!inter)?INADDR_ANY:inet_addr(inter); 
 	local.sin_port = htons(port);
 
-	listensock = socket(AF_INET, socktype,0); // connect via TCP
+	listensock = socket(AF_INET, socktype,0); // connect via socktype (UDP or TCP)
 	
 	if (listensock == INVALID_SOCKET){
 #ifdef WINDOZE
@@ -155,18 +158,18 @@ hDev = hStdout;
 		WSACleanup();
 #else
 		int errornumsave = errno;
-		fprintf(stderr,"TCP socket open failed, error number = %d\n",errornumsave);
+		fprintf(stderr,"TCP socket open failed, error number = %d (%s)\n",errornumsave,strerror(errornumsave));
 #endif
 		return -1;
 	}
 
 	if (bind(listensock,(struct sockaddr*)&local,sizeof(local) ) == SOCKET_ERROR) {
 #ifdef WINDOZE
-		fprintf(stderr,"TCP bind failed, error number = %d\n",WSAGetLastError());
+		fprintf(stderr,"IP bind failed, error number = %d\n",WSAGetLastError());
 		WSACleanup();
 #else
 		int errornumsave = errno;
-		fprintf(stderr,"TCP bind failed, error number = %d\n",errornumsave);
+		fprintf(stderr,"IP bind failed, error number = %d (%s)\n",errornumsave,strerror(errornumsave));
 #endif
 		return -1;
 	}
@@ -174,11 +177,11 @@ hDev = hStdout;
 	if (socktype != SOCK_DGRAM) {
 		if (listen(listensock,5) == SOCKET_ERROR) {
 #ifdef WINDOZE
-			fprintf(stderr,"UDP listen failed, error number = %d\n",WSAGetLastError());
+			fprintf(stderr,"TCP listen failed, error number = %d\n",WSAGetLastError());
 			WSACleanup();
 #else
 			int errornumsave = errno;
-			fprintf(stderr,"UDP listen failed, error number = %d\n",errornumsave);
+			fprintf(stderr,"TCP listen failed, error number = %d (%s)\n",errornumsave,strerror(errornumsave));
 #endif
 			return -1;
 		}
@@ -190,6 +193,7 @@ hDev = hStdout;
 #else
 	printf("Listening on %s port %d\e[0m\n", (socktype == SOCK_STREAM)?"TCP":"UDP", port);
 #endif
+
 	while(1) {
 		flen =sizeof(from);
 		if (socktype != SOCK_DGRAM) {
@@ -225,14 +229,19 @@ loop1:
 			
 		if (retval == SOCKET_ERROR) {
 #ifdef WINDOZE
-			fprintf(stderr,"UDP recv failed, error number = %d\n",WSAGetLastError());
+			fprintf(stderr,"%s recv failed, error number = %d\n",(socktype == SOCK_STREAM)?"TCP":"UDP",WSAGetLastError());
 			closesocket(msgsock);
 #else
 			int errornumsave = errno;
-			fprintf(stderr,"UDP recv failed, error number = %d\n",errornumsave);
+			fprintf(stderr,"%s recv failed, error number = %d (%s)\n",(socktype == SOCK_STREAM)?"TCP":"UDP",errornumsave,strerror(errornumsave));
 			close(msgsock);
 #endif
-			continue;
+			if ( (ierrorcount++) < MAXERRORCNT ) {
+				goto loop0;	// reest everything
+			} else{
+				break;	// admit defeat
+			}
+//			continue;
 		}
 		if (retval == 0) {
 			printf("client dis-connected\n");
@@ -270,6 +279,7 @@ loop1:
 void printint (int *ibuf,int num) 
 { 
 	int i;
+	printf(" message size statistics:\n");
 	for (i=0;i<num;i++) {
 		if ( ibuf[i] !=0) {
 			printf("i=%i #=%i\n",i,*(ibuf+i));
