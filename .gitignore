@@ -23,3 +23,4 @@ subdir.mk
 *.plg
 vc60.*
 *.res
+/Debug -- turk/
