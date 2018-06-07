@@ -125,13 +125,6 @@ int main(int argc, char **argv) {
 				usage(argv[0]);
 		}
 	}
-#ifdef WINDOZE
-OpenCon(&hStdout);
-hDev = hStdout;
-#else
-	printf("\e[H\e[2J\e[1;31m");
-#endif
-//SetScreenColor( 4, 1, 0, 0);
 
 	for (i=0;i<BUFFERSIZE;i++) iMessagesSizes[i] = 0;
 #ifdef WINDOZE
@@ -154,11 +147,11 @@ loop0:
 	
 	if (listensock == INVALID_SOCKET){
 #ifdef WINDOZE
-		fprintf(stderr,"TCP socket open failed, error number = %d\n",WSAGetLastError());
+		fprintf(stderr,"socket open failed, error number = %d\n",WSAGetLastError());
 		WSACleanup();
 #else
 		int errornumsave = errno;
-		fprintf(stderr,"TCP socket open failed, error number = %d (%s)\n",errornumsave,strerror(errornumsave));
+		fprintf(stderr,"socket open failed, error number = %d (%s)\n",errornumsave,strerror(errornumsave));
 #endif
 		return -1;
 	}
@@ -186,6 +179,15 @@ loop0:
 			return -1;
 		}
 	}
+
+#ifdef WINDOZE
+	OpenCon(&hStdout);
+	hDev = hStdout;
+#else
+	printf("\e[H\e[2J\e[1;31m");
+#endif
+//SetScreenColor( 4, 1, 0, 0);
+
 	printf("Remote Debug Server Version 3.0\n");
 #ifdef WINDOZE
 	printf("Listening on %s port %d\n", (socktype == SOCK_STREAM)?"TCP":"UDP", port);
