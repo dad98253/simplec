@@ -50,12 +50,13 @@ HANDLE hDev;
 
 
 void usage(char *arg) {
-	fprintf(stderr,"Usage : %s -p [protocol] -e [port] -i [ipaddr]\n",
+	fprintf(stderr,"Usage : %s -p [protocol] -e [port] -i [ipaddr] -x\n",
 		arg);
 	fprintf(stderr,"Where:\n\tprotocol is TCP or UDP\n");
 	fprintf(stderr,"\tport is the port to listen on\n");
 	fprintf(stderr,"\tipaddr is the ip address to bind to\n");
-	fprintf(stderr,"Defaults are UDP, 5001 and INADDR_ANY\n");
+	fprintf(stderr,"\t-x turns off the initial screen clear\n");
+	fprintf(stderr,"Defaults are UDP, 5001, INADDR_ANY and screen clear is on\n");
 #ifdef WINDOZE
 	WSACleanup();
 #endif
@@ -70,9 +71,11 @@ int main(int argc, char **argv) {
 	int ierrorcount = 0;
 	int socktype = DEF_PROTOCOL;
 	unsigned short port=DEF_PORT;
+	unsigned int temport;
 	char *inter= NULL;
 	char buf[BUFFERSIZE];
 	struct sockaddr_in local, from;
+	bool bclear = true;
 #ifdef WINDOZE
 	HANDLE hStdout;
 	WSADATA wsaData;
@@ -91,7 +94,11 @@ int main(int argc, char **argv) {
 				switch(tolower(argv[i][1])) {
 
 					case 'e':
-					port = atoi(argv[++i]);
+						temport = atoi(argv[++i]);
+					if ( temport < 1 || temport > 65535){
+						usage(argv[0]);
+					}
+					port = (unsigned short int)temport;
 					break;
 
 					case 'p':
@@ -116,6 +123,10 @@ int main(int argc, char **argv) {
 						inter = argv[++i];
 						break;
 
+					case 'x':
+						bclear = false;
+						break;
+
 					default:
 						usage(argv[0]);
 						break;
@@ -135,9 +146,7 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 #endif
-	if ( port < 1 || port > 65535){
-		usage(argv[0]);
-	}
+
 loop0:
 	local.sin_family = AF_INET;
 	local.sin_addr.s_addr = (!inter)?INADDR_ANY:inet_addr(inter); 
@@ -179,14 +188,15 @@ loop0:
 			return -1;
 		}
 	}
-
+	if ( bclear ) {
 #ifdef WINDOZE
-	OpenCon(&hStdout);
-	hDev = hStdout;
+		OpenCon(&hStdout);
+		hDev = hStdout;
+//		SetScreenColor( 4, 1, 0, 0);
 #else
-	printf("\e[H\e[2J\e[1;31m");
+		printf("\e[H\e[2J\e[1;31m");
 #endif
-//SetScreenColor( 4, 1, 0, 0);
+	}
 
 	printf("Remote Debug Server Version 3.0\n");
 #ifdef WINDOZE
