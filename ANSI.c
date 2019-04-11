@@ -120,6 +120,14 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef WIN10
+#define wcstok wcstok_s
+wchar_t* next_token1 = NULL;
+#define WCONTEXT ,&next_token1
+#else
+#define WCONTEXT
+#endif
+
 BOOL ParseAndPrintString( HANDLE hDev, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten );
 BOOL search_env( LPCTSTR var, LPCTSTR val );
 void set_ansicon( PCONSOLE_SCREEN_BUFFER_INFO pcsbi );
@@ -1222,7 +1230,7 @@ BOOL search_env( LPCTSTR var, LPCTSTR val )
   if (not && env[1] == '\0')
     return TRUE;
 
-  for (var = (const char *)wcstok( (unsigned short *)(env + not), (const unsigned short *)L";" ); var; var = (const char *)wcstok( NULL, (const unsigned short *)L";" ))
+  for (var = (const char *)wcstok( (unsigned short *)(env + not), (const unsigned short *)L";" WCONTEXT); var; var = (const char *)wcstok( NULL, (const unsigned short *)L";" WCONTEXT))
     if (_wcsicmp( (const unsigned short *)val, (const unsigned short *)var ) == 0)
       return !not;
 

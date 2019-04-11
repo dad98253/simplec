@@ -15,7 +15,9 @@
 #ifdef _WIN64
 #define _WIN32_WINNT 0x0600	// MinGW-w64 wants this defined for Wow64 stuff
 #else
+#ifndef WIN10
 #define _WIN32_WINNT 0x0500	// MinGW wants this defined for OpenThread
+#endif // WIN10
 #endif
 #include <windows.h>
 #include <stdio.h>
