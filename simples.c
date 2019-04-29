@@ -273,9 +273,9 @@ loop0:
 
 loop1:
 		if (socktype != SOCK_DGRAM)
-			retval = recv(msgsock,buf,sizeof (buf),0 );
+			retval = (int)recv(msgsock,buf,sizeof (buf),0 );
 		else {
-			retval = recvfrom(msgsock,buf,sizeof (buf),0,
+			retval = (int)recvfrom(msgsock,buf,sizeof (buf),0,
 #ifdef WINDOZE
 				(struct sockaddr *)&from,&flen);
 #else
