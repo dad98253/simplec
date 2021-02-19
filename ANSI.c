@@ -109,6 +109,7 @@
   v1.65, 28 August, 2013:
     fix \e[K (was using window, not buffer).
 */
+#define _CRT_NON_CONFORMING_WCSTOK
 //#define WIN32_LEAN_AND_MEAN
 //#include <winsock2.h>
 #include <windows.h>
