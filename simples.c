@@ -2,8 +2,12 @@
 #pragma message( "Compiling " __FILE__ " on " __DATE__ " at " __TIME__ )
 #pragma message( "File last modified on " __TIMESTAMP__ )
 #pragma message( "  ")
+#ifndef WIN10
 #pragma title( "My Secret Box version 2.0" )
 #pragma subtitle( "Copyright (c) 2003 - 2015, Nehemiah Ministries, Inc." )
+#else // WIN10
+#pragma comment(lib, "Ws2_32.lib")
+#endif	  // WIN10
 #pragma comment( compiler )
 #pragma comment( user, "File: " __FILE__ ". Compiled on " __DATE__ " at " __TIME__ ".  Last modified on " __TIMESTAMP__ )
 #endif
@@ -13,7 +17,10 @@
 #ifdef WINDOZE
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
-#endif
+#ifdef WIN10
+#include <ws2tcpip.h>
+#endif // WIN10
+#endif // WINDOZE
 #ifndef WINDOZE
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -27,6 +34,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+#ifdef WIN10
+#define stricmp _stricmp
+#endif
 
 #ifndef bool
     #define bool int
@@ -62,7 +73,7 @@ void usage(char *arg) {
 #endif
 	exit(1);
 }
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
 #define BUFFERSIZE 50000
 	int iMessagesSizes[BUFFERSIZE];
 	int i;
@@ -70,9 +81,9 @@ int main(int argc, char **argv) {
 	int retval;
 	int ierrorcount = 0;
 	int socktype = DEF_PROTOCOL;
-	unsigned short port=DEF_PORT;
+	unsigned short port = DEF_PORT;
 	unsigned int temport;
-	char *inter= NULL;
+	char* inter = NULL;
 	char buf[BUFFERSIZE];
 	struct sockaddr_in local, from;
 	bool bclear = true;
@@ -88,48 +99,48 @@ int main(int argc, char **argv) {
 #endif
 
 	// command line arguments
-	if (argc >1) {
-		for(i=1;i <argc;i++) {
-			if ( (argv[i][0] == '-') || (argv[i][0] == '/') ) {
-				switch(tolower(argv[i][1])) {
+	if (argc > 1) {
+		for (i = 1; i < argc; i++) {
+			if ((argv[i][0] == '-') || (argv[i][0] == '/')) {
+				switch (tolower(argv[i][1])) {
 
-					case 'e':
-						temport = atoi(argv[++i]);
-					if ( temport < 1 || temport > 65535){
+				case 'e':
+					temport = atoi(argv[++i]);
+					if (temport < 1 || temport > 65535) {
 						usage(argv[0]);
 					}
 					port = (unsigned short int)temport;
 					break;
 
-					case 'p':
+				case 'p':
 #ifdef WINDOZE
-						if (!stricmp(argv[i+1], "TCP") )
+					if (!stricmp(argv[i + 1], "TCP"))
 #else
-						if (!strcasecmp(argv[i+1], "TCP") )
+					if (!strcasecmp(argv[i + 1], "TCP"))
 #endif
-							socktype = SOCK_STREAM;
+						socktype = SOCK_STREAM;
 #ifdef WINDOZE
-						else if (!stricmp(argv[i+1], "UDP") )
+					else if (!stricmp(argv[i + 1], "UDP"))
 #else
-						else if (!strcasecmp(argv[i+1], "UDP") )
+					else if (!strcasecmp(argv[i + 1], "UDP"))
 #endif
-							socktype = SOCK_DGRAM;
-						else
-							usage(argv[0]);
-						i++;
-						break;
-
-					case 'i':
-						inter = argv[++i];
-						break;
-
-					case 'x':
-						bclear = false;
-						break;
-
-					default:
+						socktype = SOCK_DGRAM;
+					else
 						usage(argv[0]);
-						break;
+					i++;
+					break;
+
+				case 'i':
+					inter = argv[++i];
+					break;
+
+				case 'x':
+					bclear = false;
+					break;
+
+				default:
+					usage(argv[0]);
+					break;
 				}
 			}
 			else
@@ -137,11 +148,11 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	for (i=0;i<BUFFERSIZE;i++) iMessagesSizes[i] = 0;
+	for (i = 0; i < BUFFERSIZE; i++) iMessagesSizes[i] = 0;
 #ifdef WINDOZE
 	// start up the winsock by process
-	if (WSAStartup(0x202,&wsaData) == SOCKET_ERROR) {
-		fprintf(stderr,"winsock failed to initialize, error number = %d\n",WSAGetLastError());
+	if (WSAStartup(0x202, &wsaData) == SOCKET_ERROR) {
+		fprintf(stderr, "winsock failed to initialize, error number = %d\n", WSAGetLastError());
 		WSACleanup();
 		return -1;
 	}
@@ -149,7 +160,30 @@ int main(int argc, char **argv) {
 
 loop0:
 	local.sin_family = AF_INET;
-	local.sin_addr.s_addr = (!inter)?INADDR_ANY:inet_addr(inter); 
+#ifndef WIN10
+	local.sin_addr.s_addr = (!inter) ? INADDR_ANY : inet_addr(inter);
+#else // WIN10
+	if (!inter) {
+		local.sin_addr.s_addr = INADDR_ANY;
+	} else {
+		int ierrno = inet_pton(local.sin_family, (const char*)inter, &(local.sin_addr.s_addr));
+		if (ierrno <= 0) {
+			if (ierrno == 0) {
+				fprintf(stderr, " %s is not a character string representing a valid network address\n", inter);
+			}
+			else {
+				if (ierrno == EAFNOSUPPORT) {
+					fprintf(stderr, " local.sin_family (%0x) is not a valid address family\n", local.sin_family);
+				}
+				else {
+					fprintf(stderr, " inet_pton returned error = %d while attempting to interpret the ip address \"%s\"\n", ierrno, inter);
+					//perror(" The following error occurred in inet_pton when attempting to interpret the ip address");
+				}
+			}
+			exit(EXIT_FAILURE);
+		}
+	}
+#endif // WIN10
 	local.sin_port = htons(port);
 
 	listensock = socket(AF_INET, socktype,0); // connect via socktype (UDP or TCP)
@@ -198,7 +232,7 @@ loop0:
 #endif
 	}
 
-	printf("Remote Debug Server Version 3.0\n");
+	printf("Remote Debug Server Version 3.1\n");
 #ifdef WINDOZE
 	printf("Listening on %s port %d\n", (socktype == SOCK_STREAM)?"TCP":"UDP", port);
 	ResetScreenColor();
@@ -222,16 +256,26 @@ loop0:
 #endif
 				return -1;
 			}
-			printf("connected from %s, port %d\n", inet_ntoa(from.sin_addr), htons(from.sin_port)) ;
+#ifdef WIN10
+			char buffer[257];
+			const char* result = inet_ntop(from.sin_family, &(from.sin_addr), buffer, sizeof(buffer));
+			if (result == NULL) {
+				perror(" The following error occurred in inet_ntop when attempting to interpret the ip address : ");
+				exit(EXIT_FAILURE);
+			}
+#else // WIN10
+			const char* result = inet_ntoa(from.sin_addr);
+#endif // WIN10
+			printf("connected from %s, port %d\n", result, htons(from.sin_port)) ;
 		}
 		else
 			msgsock = listensock;
 
 loop1:
 		if (socktype != SOCK_DGRAM)
-			retval = recv(msgsock,buf,sizeof (buf),0 );
+			retval = (int)recv(msgsock,buf,sizeof (buf),0 );
 		else {
-			retval = recvfrom(msgsock,buf,sizeof (buf),0,
+			retval = (int)recvfrom(msgsock,buf,sizeof (buf),0,
 #ifdef WINDOZE
 				(struct sockaddr *)&from,&flen);
 #else

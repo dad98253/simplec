@@ -5,7 +5,7 @@
 
 void MsgBox(char *buffer)
 {
-	fprintf(stderr,"%s\n");
+	fprintf(stderr,"%s\n", buffer);
 	return;
 }
 #endif	// WINDOZE
