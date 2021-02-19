@@ -24,3 +24,10 @@ subdir.mk
 vc60.*
 *.res
 /Debug -- turk/
+.vs/
+simplec/
+simples.sln
+simples.vcxproj
+simples.vcxproj.filters
+simples.vcxproj.user
+
