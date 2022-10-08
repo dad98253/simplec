@@ -3,3 +3,6 @@ An Internet Protocol server application for viewing ANSI (color) text data sent 
 
 
 The follow-on goal of this project is to port the code to OS-X and FreeBSD.
+
+The code contributed by dad98263 is not copyrighted and is license free. (DWTFYWWI) The satatus of the other code (i.e., the ANSI routine) appears to also not be copyrighted. However, the contributer makes no guarantees. 
+
