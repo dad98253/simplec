@@ -3,8 +3,6 @@
 #pragma message( "File last modified on " __TIMESTAMP__ )
 #pragma message( "  ")
 #ifndef WIN10
-#pragma title( "My Secret Box version 2.0" )
-#pragma subtitle( "Copyright (c) 2003 - 2015, Nehemiah Ministries, Inc." )
 #else // WIN10
 #pragma comment(lib, "Ws2_32.lib")
 #endif	  // WIN10
